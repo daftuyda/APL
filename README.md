@@ -1,41 +1,122 @@
 # APL - Anime Priority List
 
 ## What is APL?
-APL is an automatic anime watch priority list maker.
+
+APL is an automated anime watch priority list tool that helps you decide what to watch next from your AniList planning list.
 
 ## How does APL work?
-APL uses AniList's API to gather a users completed and planning list which is then imported into a Google Sheet where the data can be sorted.
+
+APL connects to AniList's API to fetch your anime lists, calculates a priority score for each anime in your planning list, and displays results in a sortable table GUI. No external spreadsheet or Google account needed.
 
 ## What is the purpose of APL?
+
 As I have over 250+ anime planning to watch I usually can't decide what to watch first so I created a spreadsheet by hand to sort which anime I should watch first. This program is just to add a quality of life change for me and stop me from staying up making spreadsheets by hand.
 
+## Setup
+
+1. Install Python 3.7+
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run: `python GUI.py`
+4. Enter your AniList username and click **Generate**
+
+CLI mode is also available: `python APL.py`
+
+## Features
+
+- **Sortable table** - click any column header to sort
+- **Double-click** any anime to open its AniList page
+- **API caching** - responses cached to disk to avoid rate limits (lists: 1hr, relations: 7 days)
+- **Clear Cache** button to force fresh data
+- **Progress bar** with per-anime status during fetch
+- **Sequel detection** with relation type display (e.g. "Sequel of Attack on Titan")
+- **All-list matching** - checks COMPLETED, CURRENT, and REPEATING lists for relation matching
+- **Save User** persists your username between sessions
+
 ***
 
-## APL Score v2
-- Score = Anime score
-- B = Bingability factor
-- P = Previous season watched
-- b & p Weights = 0.5
+## APL Score v3
 
-<img src="https://i.upmath.me/svg/(Score%20-%2075)%20%5Ctimes%200.01%20%26%20%5Ctext%7B%20if%20%7D%2012%20%3C%20Eps%20%3C%2023%20%5C%5C(Score%20-%2075)%20%5Ctimes%200.01%20%2B%20%5Cfrac%7B1%20%2B%20%5Cmax(0.05%20%5Ctimes%20(Eps%20-%2024)%2C%200)%7D%7B100%7D%20%26%20%5Ctext%7B%20if%20%7D%20Eps%20%5Cgeq%2024%5C%5C%5Ctext%7Botherwise%20%7D0%0A" alt="(Score - 75) \times 0.01 &amp; \text{ if } 12 &lt; Eps &lt; 23 \\(Score - 75) \times 0.01 + \frac{1 + \max(0.05 \times (Eps - 24), 0)}{100} &amp; \text{ if } Eps \geq 24\\\text{otherwise }0
-" />
+### Factors
 
-<img src="https://i.upmath.me/svg/Score%20%5Ctimes%20%5Cleft(1%20%2B%20(B%20%5Ctimes%20bWeight%20%2B%20P%20%5Ctimes%20pWeight)%5Cright)" alt="Score \times \left(1 + (B \times bWeight + P \times pWeight)\right)" />
+**P-Factor (Previous Season)**
+Bonus applied when an anime is related to something you've completed or are currently watching. Uses the highest-weighted matching relation.
 
+| Relation Type | Bonus |
+|---------------|-------|
+| Sequel        | 0.15  |
+| Prequel       | 0.10  |
+| Side Story    | 0.08  |
+| Parent        | 0.08  |
+| Spin Off      | 0.05  |
+| Alternative   | 0.03  |
+| Character     | 0.02  |
 
-***
+**B-Factor (Bingability)**
+Bonus based on episode count - shorter anime are easier to commit to.
 
+| Episodes | Bonus                        |
+|----------|------------------------------|
+| 1-13     | 0.06                         |
+| 14-26    | (score - 70) x 0.002, min 0  |
+| 27-52    | (score - 80) x 0.001, min 0  |
+| 53+      | 0                            |
 
-# WIP #
+### Formula
 
-```[tasklist]
-To-do
-- [x] Get google sheets or some other spreasheet to work again
-- [] Get date with all lists
-- [x] Pre sort by APL score
-- [] Add relation data for series order
-- [] Add series order
-- [/] Better score weighting
-- [] Update instructions
-- [] Discord bot
+```text
+APL = Score x (1 + P x 0.6 + B x 0.4)
 ```
+
+- **Score** = AniList average score (0-100)
+- **P** = Previous season factor (0 to 0.15)
+- **B** = Bingability factor (0 to 0.06)
+- P-weight = 0.6 (sequel bonus weighted higher as a stronger recommendation signal)
+- B-weight = 0.4
+
+***
+
+## Caching
+
+API responses are cached locally in `.cache/` to avoid rate limiting:
+
+- **User list data**: cached for 1 hour
+- **Relation data**: cached for 7 days (anime relations rarely change)
+- Use the **Clear Cache** button or delete the `.cache/` folder to force fresh data
+
+***
+
+## WIP / Future Ideas
+
+- [ ] Export table to CSV
+- [ ] Include movies, OVAs, and ONAs in planning list (currently TV/TV_SHORT only)
+- [ ] Popularity factor - weight by AniList popularity/trending data
+- [ ] User score influence - factor in personal scores from completed anime when boosting sequels
+- [ ] Configurable weights - let users adjust P/B weights and thresholds in the GUI
+- [ ] Genre preference scoring - learn preferred genres from completed list
+- [ ] Seasonal filter - option to filter by release season/year
+- [ ] Multi-user comparison - compare planning lists between friends
+- [ ] Airing status support - include currently airing anime with estimated completion
+- [ ] Discord bot
+
+***
+
+## Changelog
+
+### v3
+
+- Removed Google Sheets dependency - results displayed in built-in sortable table
+- Added disk-based API caching to avoid rate limits
+- Fetches all lists in a single API call (was 2 separate calls)
+- Relation queries now fetch for planning anime instead of all completed anime
+- Added relation type detection (SEQUEL, PREQUEL, SIDE_STORY, etc.) with weighted scoring
+- Fixed bFactor: short anime (1-13 eps) now correctly get highest bingability bonus
+- Fixed useless loop bugs in bFactor and aplCalc functions
+- Rebalanced weights: P-Factor 0.6 / B-Factor 0.4 (sequel signal weighted higher)
+- Added progress bar and error handling in GUI
+- Dark themed UI with clickable AniList links
+- CLI mode prints formatted table
+
+### v2
+
+- Initial Google Sheets integration
+- Basic APL scoring with bFactor and pFactor
